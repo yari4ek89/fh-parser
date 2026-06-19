@@ -16,7 +16,7 @@ FH_API_TOKEN = os.getenv("FH_API_TOKEN")
 
 PORTFOLIO_URL = "https://github.com/yari4ek89"
 
-API_URL = "https://api.freelancehunt.com/v2"
+API_URL = "https://api.freelancehunt.com/v2/projects"
 HEADERS = {
     "Authorization": f"Bearer {FH_API_TOKEN}",
     "Accept-Language": "uk"

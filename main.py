@@ -36,27 +36,31 @@ async def root():
 async def generate_groq_cover_letter(task_title: str, task_description: str) -> str:
     system_prompt = (
         "Ты — уверенный и опытный Python/FastAPI веб-разработчик по имени Ярослав. "
-        "Твоя задача — написать короткий, коммерческий отклик на фриланс-заказ.\n"
+        "Твоя задача — написать короткий отклик на фриланс-заказ.\n"
         "ПРАВИЛА:\n"
-        "1. Пиши строго на языке заказа (украинский или русский).\n"
-        "2. Будь лаконичен (3-5 предложений), без воды.\n"
-        "3. Предложи техническое решение проблемы из описания, упомяни стек Python/FastAPI.\n"
-        "4. Предложи обсудить детали в ЛС и прикрепи портфолио: {portfolio}."
+        "1. Пиши строго на языке заказа.\n"
+        "2. Будь лаконичен (3-4 предложения), без воды.\n"
+        "3. Предложи техническое решение, упомяни стек Python/FastAPI.\n"
+        "4. В конце укажи ссылку на портфолио: {portfolio}."
     ).format(portfolio=PORTFOLIO_URL)
+
+    clean_description = task_description.replace("<p>", "").replace("</p>", "").replace("<br>", "\n")
 
     try:
         response = await ai_client.chat.completions.create(
-            model="llama3-8b-8192", 
+            model="llama-3.1-8b-instant",  # Вот этот фикс! Актуальная бесплатная модель
             messages=[
                 {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Заказ: {task_title}\nОписание: {task_description}"}
+                {"role": "user", "content": f"Заказ: {task_title}\nОписание: {clean_description}"}
             ],
-            temperature=0.6
+            temperature=0.5
         )
-        return response.choices[0].message.content
+        # Очищаем от тегов, которые могут сломать отображение
+        reply = response.choices[0].message.content
+        return reply.replace("<", "&lt;").replace(">", "&gt;")
     except Exception as e:
         logging.error(f"Ошибка Groq: {e}")
-        return "Не удалось сгенерировать отклик автоматически."
+        return "Привет! Готов обсудить детали проекта в ЛС. Опыт работы с бэкендом и API есть, сделаю всё быстро и качественно."
 
 async def check_freelancehunt_api():
     async with httpx.AsyncClient() as client:

@@ -16,7 +16,8 @@ FH_API_TOKEN = os.getenv("FH_API_TOKEN")
 
 PORTFOLIO_URL = "https://github.com/yari4ek89"
 
-API_URL = "https://api.freelancehunt.com/v2/projects"
+# ФИКС: Добавлен фильтр категории [category_id]=1, чтобы слать только программирование
+API_URL = "https://api.freelancehunt.com/v2/projects?filter[category_id]=1"
 HEADERS = {
     "Authorization": f"Bearer {FH_API_TOKEN}",
     "Accept-Language": "uk"
@@ -48,16 +49,15 @@ async def generate_groq_cover_letter(task_title: str, task_description: str) -> 
 
     try:
         response = await ai_client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Вот этот фикс! Актуальная бесплатная модель
+            model="llama-3.1-8b-instant",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Заказ: {task_title}\nОписание: {clean_description}"}
             ],
             temperature=0.5
         )
-        # Находится в самом конце функции генерации текста перед return:
         reply = response.choices[0].message.content
-        # Экранируем стрелочки, чтобы HTML не ругался
+        # Экранируем символы HTML, чтобы не ломать parse_mode="HTML"
         return reply.replace("<", "&lt;").replace(">", "&gt;")
     except Exception as e:
         logging.error(f"Ошибка Groq: {e}")
@@ -68,6 +68,7 @@ async def check_freelancehunt_api():
         try:
             response = await client.get(API_URL, headers=HEADERS)
             if response.status_code != 200:
+                logging.error(f"Ошибка Freelancehunt API: {response.status_code}")
                 return
             
             projects = response.json().get("data", [])
@@ -89,28 +90,33 @@ async def check_freelancehunt_api():
                 attributes = project.get("attributes", {})
                 title = attributes.get("name")
                 description = attributes.get("description_html", "")
-                link = project.get("links", {}).get("self", {}).get("html")
+                
+                # ФИКС: В Freelancehunt API v2 прямая ссылка лежит прямо в project["links"]["html"]
+                link = project.get("links", {}).get("html", "")
+                
+                # Защитная проверка ссылки
+                if not link or link == "None":
+                    link = f"https://freelancehunt.com/project/{project_id}.html"
                 
                 budget_data = attributes.get("budget")
                 budget = f"{budget_data['amount']} {budget_data['currency']}" if budget_data else "Договорной"
                 
                 cover_letter = await generate_groq_cover_letter(title, description)
                 
-                # 1. Формируем сообщение чисто через HTML-теги
+                # Формируем сообщение через чистый HTML
                 message_text = (
                     f"🟢 <b>Новый заказ на Freelancehunt!</b>\n"
                     f"📌 <b>{title}</b>\n"
                     f"💰 <b>Бюджет:</b> {budget}\n\n"
                     f"🤖 <b>Отклик от Groq:</b>\n"
-                    f"<pre>{cover_letter}</pre>\n\n"  # <pre> делает текст моноширинным и копируемым в один клик
-                    f"🔗 <a href='{link}'>ОТКРЫТЬ И ОТПРАВИТЬ</a>" # Правильная HTML ссылка
+                    f"<pre>{cover_letter}</pre>\n\n"
+                    f"🔗 <a href='{link}'>ОТКРЫТЬ И ОТПРАВИТЬ</a>"
                 )
                 
-                # 2. Обязательно меняем parse_mode на "HTML"
                 await bot.send_message(
                     chat_id=CHAT_ID, 
                     text=message_text, 
-                    parse_mode="HTML",  # КРИТИЧЕСКИЙ ФИКС!
+                    parse_mode="HTML",
                     disable_web_page_preview=True
                 )
                 await asyncio.sleep(1)
@@ -123,6 +129,7 @@ async def monitor_loop():
         await check_freelancehunt_api()
         await asyncio.sleep(60)
 
-@app.on_event("startup")
+# Используем современный способ управления жизненным циклом FastAPI вместо устаревшего on_event
+@app.router.on_startup.append
 async def startup_event():
     asyncio.create_task(monitor_loop())

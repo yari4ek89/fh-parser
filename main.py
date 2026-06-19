@@ -4,11 +4,15 @@ import httpx
 from fastapi import FastAPI
 from aiogram import Bot
 from openai import AsyncOpenAI
+import os
+from dotenv import load_dotenv
 
-TELEGRAM_TOKEN = "8226489943:AAHrww1U8oBKrTKqIfzuKy8-KonCbrtKy-Y"
-CHAT_ID = "7420183488"
-GROQ_API_KEY = "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"
-FH_API_TOKEN = "5eaedd1edeff786df8ae6e396c02950da04b9121"
+load_dotenv()
+
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("CHAT_ID")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+FH_API_TOKEN = os.getenv("FH_API_TOKEN")
 
 PORTFOLIO_URL = "https://github.com/yari4ek89"
 

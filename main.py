@@ -55,8 +55,9 @@ async def generate_groq_cover_letter(task_title: str, task_description: str) -> 
             ],
             temperature=0.5
         )
-        # Очищаем от тегов, которые могут сломать отображение
+        # Находится в самом конце функции генерации текста перед return:
         reply = response.choices[0].message.content
+        # Экранируем стрелочки, чтобы HTML не ругался
         return reply.replace("<", "&lt;").replace(">", "&gt;")
     except Exception as e:
         logging.error(f"Ошибка Groq: {e}")
@@ -95,15 +96,23 @@ async def check_freelancehunt_api():
                 
                 cover_letter = await generate_groq_cover_letter(title, description)
                 
+                # 1. Формируем сообщение чисто через HTML-теги
                 message_text = (
-                    f"🟢 **Новый заказ на Freelancehunt!**\n"
-                    f"📌 **{title}**\n"
-                    f"💰 **Бюджет:** {budget}\n\n"
-                    f"🤖 **Отклик от Groq (Llama-3):**\n"
-                    f"```{cover_letter}```\n\n"
-                    f"🔗 [ОТКРЫТЬ И ОТПРАВИТЬ]({link})"
+                    f"🟢 <b>Новый заказ на Freelancehunt!</b>\n"
+                    f"📌 <b>{title}</b>\n"
+                    f"💰 <b>Бюджет:</b> {budget}\n\n"
+                    f"🤖 <b>Отклик от Groq:</b>\n"
+                    f"<pre>{cover_letter}</pre>\n\n"  # <pre> делает текст моноширинным и копируемым в один клик
+                    f"🔗 <a href='{link}'>ОТКРЫТЬ И ОТПРАВИТЬ</a>" # Правильная HTML ссылка
                 )
-                await bot.send_message(chat_id=CHAT_ID, text=message_text, parse_mode="Markdown")
+                
+                # 2. Обязательно меняем parse_mode на "HTML"
+                await bot.send_message(
+                    chat_id=CHAT_ID, 
+                    text=message_text, 
+                    parse_mode="HTML",  # КРИТИЧЕСКИЙ ФИКС!
+                    disable_web_page_preview=True
+                )
                 await asyncio.sleep(1)
         except Exception as e:
             logging.error(f"Ошибка парсинга: {e}")

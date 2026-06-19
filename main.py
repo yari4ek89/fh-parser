@@ -6,6 +6,31 @@ from aiogram import Bot
 from openai import AsyncOpenAI
 import os
 from dotenv import load_dotenv
+import re
+
+def slugify(text: str) -> str:
+    """Переводит текст в безопасный для URL слаг (кириллицу в транслит)"""
+    # Простейший словарь для украинского/русского транслита
+    translit_dict = {
+        'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ж': 'zh', 'з': 'z',
+        'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o', 'п': 'p',
+        'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'kh', 'ц': 'ts', 'ч': 'ch',
+        'ш': 'sh', 'щ': 'shch', 'ь': '', 'ы': 'y', 'ъ': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+        'і': 'i', 'ї': 'yi', 'є': 'ye', 'ґ': 'g'
+    }
+    
+    text = text.lower().strip()
+    # Заменяем символы по словарю
+    res = ""
+    for char in text:
+        res += translit_dict.get(char, char)
+        
+    # Оставляем только латиницу, цифры и дефисы
+    res = re.sub(r'[^a-z0-9\s-]', '', res)
+    # Заменяем пробелы на дефисы
+    res = re.sub(r'[\s-]+', '-', res)
+    
+    return res.strip('-')
 
 load_dotenv()
 
@@ -96,7 +121,17 @@ async def check_freelancehunt_api():
                 
                 # Защитная проверка ссылки
                 if not link or link == "None":
-                    link = f"https://freelancehunt.com/project/{project_id}.html"
+                    attributes = project.get("attributes", {})
+                    title = attributes.get("name")
+                    description = attributes.get("description_html", "")
+                    
+                    # Генерируем правильный ЧПУ слаг из названия проекта
+                    project_slug = slugify(title)
+                    if not project_slug:
+                        project_slug = "project"
+
+                    # Собираем железную ссылку по правильному паттерну Freelancehunt
+                    link = f"https://freelancehunt.com/project/{project_slug}/{project_id}.html"
                 
                 budget_data = attributes.get("budget")
                 budget = f"{budget_data['amount']} {budget_data['currency']}" if budget_data else "Договорной"
